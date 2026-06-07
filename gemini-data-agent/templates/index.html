@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gemini AI Data Agent Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style>
+        /* Target pandas default output classes for clean styling matching Tailwind */
+        .pandas-table th { background-color: #f9fafb; font-weight: 600; padding: 0.75rem; border: 1px solid #e5e7eb; }
+        .pandas-table td { padding: 0.75rem; border: 1px solid #e5e7eb; font-family: monospace; }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 min-h-screen">
+
+    <div class="max-w-5xl mx-auto px-4 py-8">
+        <header class="mb-10 text-center">
+            <h1 class="text-4xl font-extrabold text-indigo-700 tracking-tight">🚀 AI Data Science Sandbox</h1>
+            <p class="text-gray-500 mt-2">Upload datasets, view static profiles, and evaluate algorithmic choices.</p>
+        </header>
+
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-8">
+            <form action="/analyze" method="POST" enctype="multipart/form-data" onsubmit="showLoading()">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">Dataset File (.csv, .xlsx)</label>
+                        <input type="file" name="file" required 
+                            class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 border border-gray-300 rounded-md p-1.5 focus:outline-indigo-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">What should the agent discover?</label>
+                        <textarea name="prompt" rows="2" required placeholder="Describe what metrics you want analyzed..." 
+                            class="w-full border border-gray-300 rounded-md p-2 text-sm focus:outline-indigo-500"></textarea>
+                    </div>
+                </div>
+                <div class="mt-4 flex justify-end">
+                    <button type="submit" id="submitBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 px-6 rounded-md transition duration-150 ease-in-out shadow-sm">
+                        Execute AI Workflow
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        {% if error_message %}
+        <div class="bg-red-50 border-l-4 border-red-500 p-4 rounded-r-md mb-6">
+            <p class="text-sm text-red-900 font-bold">An Error Occurred</p>
+            <p class="text-xs text-red-700 mt-1 font-mono whitespace-pre-line">{{ error_message }}</p>
+        </div>
+        {% endif %}
+
+        <div id="loadingIndicator" class="hidden text-center py-12">
+            <div class="inline-block animate-spin rounded-full h-12 w-12 border-4 border-indigo-500 border-t-transparent mb-4"></div>
+            <p class="text-gray-600 font-medium">Extracting profiles and compiling sandbox recommendations...</p>
+        </div>
+
+        {% if results %}
+        <div id="resultsWrapper" class="space-y-6">
+            
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                <h2 class="text-xl font-bold text-gray-900 mb-4">📋 Dataset Structural Inspection</h2>
+                
+                <div class="space-y-6">
+                    <div>
+                        <h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">DataFrame info summary</h3>
+                        <pre class="bg-gray-900 text-green-400 text-xs p-4 rounded-lg overflow-x-auto font-mono shadow-inner">{{ pandas_info }}</pre>
+                    </div>
+
+                    <div>
+                        <h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">DataFrame statistical description</h3>
+                        <div class="overflow-x-auto rounded-lg border border-gray-200 pandas-table bg-white">
+                            {{ pandas_describe | safe }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                <h2 class="text-xl font-bold text-gray-900 mb-4">📉 Sandbox Generated Visualizations</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="bg-gray-50 p-4 border border-gray-100 rounded-lg text-center">
+                        <h3 class="text-sm font-semibold text-gray-600 mb-2">Distribution Analysis (Boxplot)</h3>
+                        {% if results.charts.boxplot %}
+                            <img src="{{ results.charts.boxplot }}" class="mx-auto rounded-md shadow-sm bg-white max-h-80 object-contain">
+                        {% else %}
+                            <div class="py-12 text-gray-400 text-xs">No boxplot diagram returned.</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="bg-gray-50 p-4 border border-gray-100 rounded-lg text-center">
+                        <h3 class="text-sm font-semibold text-gray-600 mb-2">Correlation Analysis (Scatter Diagram)</h3>
+                        {% if results.charts.scatter %}
+                            <img src="{{ results.charts.scatter }}" class="mx-auto rounded-md shadow-sm bg-white max-h-80 object-contain">
+                        {% else %}
+                            <div class="py-12 text-gray-400 text-xs">No scatter diagram returned.</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                <h2 class="text-xl font-bold text-gray-900 mb-3">📊 Executive Summary of Findings</h2>
+                <p class="text-gray-700 leading-relaxed bg-gray-50 p-4 rounded-lg border border-gray-100 whitespace-pre-line mb-6">
+                    {{ results.summary_of_findings }}
+                </p>
+
+                <h3 class="text-lg font-bold text-gray-900 mb-4">💡 Actionable Cleaning Options</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div class="border border-gray-200 rounded-xl p-4 bg-gray-50 flex flex-col justify-between">
+                        <div>
+                            <span class="text-xs font-bold uppercase tracking-wider text-red-600 bg-red-50 px-2 py-0.5 rounded">Option 1</span>
+                            <h4 class="font-bold text-gray-800 mt-2">Strict Row Pruning</h4>
+                            <p class="text-xs text-gray-500 mt-1">Completely drops rows containing null targets or values beyond 3 standard deviations.</p>
+                        </div>
+                        <button onclick="triggerMitigation('Strict Pruning')" class="w-full mt-4 text-xs font-semibold bg-red-600 hover:bg-red-700 text-white py-2 px-3 rounded-md shadow transition">
+                            Apply Strict Pruning
+                        </button>
+                    </div>
+
+                    <div class="border border-gray-200 rounded-xl p-4 bg-gray-50 flex flex-col justify-between">
+                        <div>
+                            <span class="text-xs font-bold uppercase tracking-wider text-amber-600 bg-amber-50 px-2 py-0.5 rounded">Option 2</span>
+                            <h4 class="font-bold text-gray-800 mt-2">Impute & Winsorize</h4>
+                            <p class="text-xs text-gray-500 mt-1">Fills nulls with column median/mean and clips outliers to the 1st/99th percentiles.</p>
+                        </div>
+                        <button onclick="triggerMitigation('Imputation and Winsorization')" class="w-full mt-4 text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white py-2 px-3 rounded-md shadow transition">
+                            Apply Impute & Cap
+                        </button>
+                    </div>
+
+                    <div class="border border-gray-200 rounded-xl p-4 bg-gray-50 flex flex-col justify-between">
+                        <div>
+                            <span class="text-xs font-bold uppercase tracking-wider text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">Option 3</span>
+                            <h4 class="font-bold text-gray-800 mt-2">Isolate & Flag</h4>
+                            <p class="text-xs text-gray-500 mt-1">Keeps data intact but generates new Boolean feature columns flagging anomalies.</p>
+                        </div>
+                        <button onclick="triggerMitigation('Isolate and Flag')" class="w-full mt-4 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white py-2 px-3 rounded-md shadow transition">
+                            Apply Flagging Matrix
+                        </button>
+                    </div>
+                </div>
+
+                <h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">Strategic Guidelines</h3>
+                <ul class="space-y-3">
+                    {% for rec in results.recommendations %}
+                    <li class="flex items-start gap-3 text-gray-700">
+                        <span class="flex-shrink-0 flex items-center justify-center bg-indigo-100 text-indigo-700 font-bold rounded-full h-6 w-6 text-xs mt-0.5">
+                            {{ loop.index }}
+                        </span>
+                        <p class="pt-0.5 text-sm">{{ rec }}</p>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+        {% endif %}
+
+    </div>
+
+    <script>
+        function showLoading() {
+            document.getElementById('submitBtn').disabled = true;
+            document.getElementById('submitBtn').classList.add('opacity-50', 'cursor-not-allowed');
+            document.getElementById('loadingIndicator').classList.remove('hidden');
+            const results = document.getElementById('resultsWrapper');
+            if (results) results.classList.add('opacity-40');
+        }
+
+        function triggerMitigation(strategyName) {
+            alert(`Selected Strategy: ${strategyName}\n\nThis triggers your data preparation workflow. You can link this to a FastAPI endpoint (e.g., /clean-data) to run the selected pipeline on your DataFrame.`);
+        }
+    </script>
+</body>
+</html>
